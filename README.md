@@ -81,7 +81,7 @@ finance-pathway/
 ├── main.py                 # app entry point (planned)
 ├── app/
 │   ├── pages/              # one file per module page
-│   ├── components/         # reusable UI pieces (calculator card, quiz)
+│   ├── components/         # reusable UI pieces (calculator,card, quiz)
 │   └── services/           # quiz engine, progress tracking, path manager
 ├── core/
 │   ├── __init__.py

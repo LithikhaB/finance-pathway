@@ -163,3 +163,28 @@ def ltv_cac_ratio(avg_revenue_per_month: float, gross_margin: float,
     _require(cac > 0, "CAC must be positive")
     ltv = avg_revenue_per_month * gross_margin / monthly_churn
     return ltv / cac
+
+
+def cac_payback_months(avg_revenue_per_month: float, gross_margin: float, cac: float) -> float:
+    """Months of gross-margin revenue needed to recover the cost of acquiring a customer."""
+    _require(avg_revenue_per_month > 0, "revenue must be positive")
+    _require(gross_margin > 0, "gross margin must be positive")
+    _require(cac > 0, "CAC must be positive")
+    return cac / (avg_revenue_per_month * gross_margin)
+
+
+# ---------------------------------------------------------------- Module 8
+def value_at_risk(portfolio_value: float, daily_volatility: float,
+                  confidence: float = 0.95, days: int = 1) -> float:
+    """Parametric (variance-covariance) VaR, assuming normally distributed returns.
+
+    Returns the loss magnitude expected NOT to be exceeded with the given
+    confidence over the given horizon. E.g. a 95% 1-day VaR of 10,000 means
+    a loss beyond 10,000 in a single day is expected only 5% of the time.
+    """
+    import math
+    z_scores = {0.90: 1.2816, 0.95: 1.6449, 0.99: 2.3263}
+    _require(confidence in z_scores, "confidence must be 0.90, 0.95, or 0.99")
+    _require(portfolio_value >= 0 and daily_volatility >= 0, "value and volatility must be non-negative")
+    _require(days >= 1, "days must be >= 1")
+    return portfolio_value * daily_volatility * z_scores[confidence] * math.sqrt(days)

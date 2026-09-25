@@ -111,3 +111,25 @@ def test_sip_zero_rate():
 def test_ltv_cac_ratio():
     # 20 revenue/month, 50% margin, 5% churn -> LTV 200; CAC 50 -> 4.0
     assert c.ltv_cac_ratio(20, 0.5, 0.05, 50) == pytest.approx(4.0)
+
+
+def test_cac_payback_months():
+    # ₹100 revenue/month, 40% margin -> ₹40 margin/month; CAC ₹200 -> 5 months
+    assert c.cac_payback_months(100, 0.4, 200) == pytest.approx(5.0)
+
+
+# ------------------------------------------------------------ risk
+def test_value_at_risk_known_z_score():
+    # 95% z-score is 1.6449: VaR = 100000 * 0.02 * 1.6449 * sqrt(1)
+    assert c.value_at_risk(100_000, 0.02, 0.95, 1) == pytest.approx(3289.8, abs=0.1)
+
+
+def test_value_at_risk_scales_with_sqrt_time():
+    one_day = c.value_at_risk(100_000, 0.02, 0.95, 1)
+    four_day = c.value_at_risk(100_000, 0.02, 0.95, 4)
+    assert four_day == pytest.approx(one_day * 2)  # sqrt(4) = 2
+
+
+def test_value_at_risk_rejects_bad_confidence():
+    with pytest.raises(ValueError):
+        c.value_at_risk(100_000, 0.02, 0.80, 1)
