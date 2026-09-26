@@ -67,11 +67,12 @@ _FONTS = (
 
 
 @contextmanager
-def frame(show_home_link: bool = True, show_calculator: bool = True):
-    """Shared page chrome: header, main content column, and (optionally) a
-    calculator on the right that only appears once a quiz scrolls into view,
-    so the learner can check a number without leaving the page."""
+def frame(show_home_link: bool = True, show_calculator: bool = True, show_chat: bool = True):
+    """Shared page chrome: header, main content column, an optional calculator
+    that only appears once a quiz scrolls into view, and an optional floating
+    chat bubble available throughout the app."""
     from app.components.calculator import calculator  # lazy: avoids circular import
+    from app.components.chat import chat_widget  # lazy: avoids circular import
 
     ui.add_head_html(_FONTS)
     ui.add_css(_CSS)
@@ -126,3 +127,5 @@ def frame(show_home_link: bool = True, show_calculator: bool = True):
                 })();
                 """
             )
+        if show_chat:
+            chat_widget()

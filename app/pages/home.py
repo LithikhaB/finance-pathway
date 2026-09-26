@@ -50,3 +50,14 @@ def home() -> None:
                                 )
                         else:
                             ui.label("Coming soon").classes("muted text-sm")
+
+        with ui.column().classes("w-full gap-0 mt-6"):
+            ui.label("Tools").classes("text-xl serif")
+            ui.label("Extra ways to explore, outside the module order.").classes("muted mb-2")
+            with ui.row().classes("module-row w-full items-center no-wrap"):
+                with ui.column().classes("gap-0 grow"):
+                    ui.link("Company lookup", "/company").classes("plain font-medium text-lg")
+                    ui.label(
+                        "See what a company does, how it earns, and how it moves money."
+                    ).classes("muted text-sm")
+                ui.button("Open", on_click=lambda: ui.navigate.to("/company")).props("flat dense")

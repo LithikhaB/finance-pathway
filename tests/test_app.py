@@ -201,3 +201,84 @@ async def test_wrong_password_rejected(user: User):
     user.find(marker="login-password").type("not-the-password")
     user.find(kind=ui.button, content="Log in").click()
     await user.should_see("Incorrect username or password.")
+
+
+def test_password_is_hashed_not_stored_plain():
+    from app.services import auth
+    from app.services.db import connect
+    ok, _ = auth.register("hash-check-user", "supersecret")
+    assert ok
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE username = ?", ("hash-check-user",)
+        ).fetchone()
+    assert row["password_hash"] != "supersecret"
+    assert auth.verify("hash-check-user", "supersecret")
+    assert not auth.verify("hash-check-user", "wrong")
+
+
+async def test_progress_persists_across_a_fresh_db_connection(user: User):
+    await _login(user)
+    from app.services import progress
+    progress.record_score(1, 3, 3)
+    entry = progress.get(1)
+    assert entry is not None
+    assert entry["done"] is True
+    # a brand new connection (simulating a restart reading the same file) sees it too
+    from app.services.db import connect
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT score, done FROM progress WHERE module_id = 1"
+        ).fetchone()
+    assert row["score"] == 3
+    assert row["done"] == 1
+
+
+def test_chatbot_fallback_answers_known_term():
+    from app.services import chatbot
+    answer = chatbot.ask("What is compound interest?")
+    assert "compound" in answer.lower() or "interest" in answer.lower()
+
+
+def test_chatbot_fallback_unknown_term_points_to_examples():
+    from app.services import chatbot
+    answer = chatbot.ask("What is quantum computing?")
+    assert "don't have a built-in answer" in answer
+
+
+def test_company_lookup_known_company():
+    from app.services import chatbot
+    answer = chatbot.explain_company("Citigroup")
+    assert "citi" in answer.lower()
+
+
+def test_company_lookup_unknown_company_lists_examples():
+    from app.services import chatbot
+    answer = chatbot.explain_company("Some Made Up Fintech Inc")
+    assert "don't have a built-in profile" in answer
+
+
+async def test_company_page_renders_and_looks_up(user: User):
+    await _login(user)
+    await user.open("/company")
+    await user.should_see("Company lookup")
+    user.find(marker="company-name-input").type("Citigroup")
+    user.find(marker="company-lookup-button").click()
+    await user.should_see("Citigroup")
+
+
+async def test_home_links_to_company_lookup(user: User):
+    await _login(user)
+    await user.should_see("Company lookup")
+
+
+async def test_chat_widget_opens_and_answers(user: User):
+    await _login(user)
+    await user.open("/module/1")
+    user.find(marker="chat-bubble").click()
+    await user.should_see("Ask about finance")
+    await user.should_see("Ask me about any term from the curriculum")
+    user.find(marker="chat-question-input").type("What is compound interest?")
+    user.find(marker="chat-send-button").click()
+    await user.should_see("What is compound interest?")
+    await user.should_see("compound interest")

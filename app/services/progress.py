@@ -1,39 +1,64 @@
-"""In-memory progress, kept separate per signed-in username.
-
-Everything lives in a plain dict, so it resets whenever the app is
-restarted (`python main.py`) — there is no database yet. Swap `_STATE`
-for a real lookup (e.g. SQLite keyed by username) later without touching
-the pages: only the functions below are used by the UI.
+"""Quiz progress, backed by SQLite so it survives an app restart and is
+kept separate per signed-in username. The functions below are the only
+thing pages call, so the storage underneath can change without touching
+any page.
 """
 from app.services import auth
+from app.services.db import connect, init
+
+init()
 
 PASS_RATIO = 0.6
 
-_STATE: dict[str, dict[str, dict]] = {}
 
-
-def _user_state() -> dict[str, dict]:
-    username = auth.current_user() or "guest"
-    return _STATE.setdefault(username, {})
+def _username() -> str:
+    return auth.current_user() or "guest"
 
 
 def record_score(module_id: int, score: int, total: int) -> dict:
-    state = _user_state()
-    previous = state.get(str(module_id), {}).get("score", 0)
-    best = max(previous, score)
-    entry = {"score": best, "total": total, "done": best / total >= PASS_RATIO}
-    state[str(module_id)] = entry
-    return entry
+    username = _username()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT score FROM progress WHERE username = ? AND module_id = ?",
+            (username, module_id),
+        ).fetchone()
+        previous = row["score"] if row else 0
+        best = max(previous, score)
+        done = 1 if best / total >= PASS_RATIO else 0
+        conn.execute(
+            """INSERT INTO progress (username, module_id, score, total, done)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(username, module_id) DO UPDATE SET
+                   score = excluded.score, total = excluded.total, done = excluded.done""",
+            (username, module_id, best, total, done),
+        )
+    return {"score": best, "total": total, "done": bool(done)}
 
 
 def get(module_id: int) -> dict | None:
-    return _user_state().get(str(module_id))
+    username = _username()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT score, total, done FROM progress WHERE username = ? AND module_id = ?",
+            (username, module_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"score": row["score"], "total": row["total"], "done": bool(row["done"])}
 
 
 def completed_count() -> int:
-    return sum(1 for e in _user_state().values() if e.get("done"))
+    username = _username()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM progress WHERE username = ? AND done = 1",
+            (username,),
+        ).fetchone()
+    return row["c"]
 
 
 def reset() -> None:
     """Clear the current user's progress. Exposed for tests and a future 'start over' button."""
-    _user_state().clear()
+    username = _username()
+    with connect() as conn:
+        conn.execute("DELETE FROM progress WHERE username = ?", (username,))

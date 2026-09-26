@@ -1,8 +1,8 @@
 import os
-
 from nicegui import ui
-
 from app.pages import register
+from dotenv import load_dotenv
+load_dotenv()  
 
 register()
 

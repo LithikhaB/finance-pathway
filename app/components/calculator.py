@@ -16,9 +16,9 @@ _OPS = {
     "\u00f7": lambda a, b: a / b if b != 0 else float("nan"),
 }
 
-_OP_INACTIVE = f"background:#FFFFFF; color:{TEAL}; border:1px solid {TEAL}; min-width:0;"
-_OP_ACTIVE = f"background:{TEAL}; color:#FFFFFF; border:1px solid {TEAL}; min-width:0;"
-_EQUALS = f"background:{INK}; color:#FFFFFF; border:1px solid {INK}; min-width:0;"
+_OP_INACTIVE = f"background:#FFFFFF; color:{TEAL}; border:1px solid {RULE}; min-width:0;"
+_OP_ACTIVE = f"background:rgba(15,118,110,0.10); color:{TEAL}; border:2px solid {TEAL}; min-width:0;"
+_EQUALS = f"background:rgba(15,118,110,0.10); color:{TEAL}; border:2px solid {TEAL}; min-width:0; font-weight:600;"
 _DIGIT = f"background:#FFFFFF; color:{INK}; border:1px solid {RULE}; min-width:0;"
 _UTILITY = f"background:{PAPER}; color:{MUTED}; border:1px solid {RULE}; min-width:0;"
 
@@ -106,13 +106,13 @@ def calculator() -> None:
             refresh_display()
 
         def digit_btn(label: str, on_click):
-            return ui.button(label, on_click=on_click).classes("grow").style(_DIGIT)
+            return ui.button(label, on_click=on_click).props("flat").classes("grow").style(_DIGIT)
 
         def utility_btn(label: str, on_click):
-            return ui.button(label, on_click=on_click).classes("grow").style(_UTILITY)
+            return ui.button(label, on_click=on_click).props("flat").classes("grow").style(_UTILITY)
 
         def op_btn(label: str, op: str):
-            button = ui.button(label, on_click=lambda: choose_op(op)).classes("grow").style(_OP_INACTIVE)
+            button = ui.button(label, on_click=lambda: choose_op(op)).props("flat").classes("grow").style(_OP_INACTIVE)
             op_buttons[op] = button
             return button
 
@@ -139,4 +139,4 @@ def calculator() -> None:
         with ui.row().classes("gap-1 w-full no-wrap"):
             digit_btn("0", lambda: digit("0"))
             digit_btn(".", dot)
-            ui.button("=", on_click=equals).classes("grow").style(_EQUALS)
+            ui.button("=", on_click=equals).props("flat").classes("grow").style(_EQUALS)
