@@ -2,6 +2,8 @@ from contextlib import contextmanager
 
 from nicegui import ui
 
+from app.services import auth
+
 PAPER = "#F3F5F7"
 INK = "#12213A"
 TEAL = "#0F766E"
@@ -46,13 +48,15 @@ a.plain:hover {{ text-decoration: underline; }}
 .formula .frac .den {{ padding: 3px 6px 0; }}
 .formula .key {{ color: {MUTED}; font-family: 'IBM Plex Sans', sans-serif; font-size: 0.9rem; white-space: normal; }}
 
-/* Calculator sits to the right and follows scroll; stacks below content on narrow screens. */
+/* Calculator sits to the right and follows scroll; hidden until a quiz is on screen. */
 .layout-row {{ flex-wrap: nowrap; }}
-.calc-sidebar {{ width: 240px; flex-shrink: 0; position: sticky; top: 88px; }}
+.calc-sidebar {{ width: 240px; flex-shrink: 0; position: sticky; top: 88px; display: none; }}
+.calc-sidebar.calc-visible {{ display: block; }}
 @media (max-width: 900px) {{
     .layout-row {{ flex-wrap: wrap; }}
     .calc-sidebar {{ position: static; width: 100%; max-width: 320px; }}
 }}
+.calc-close {{ position: absolute; top: 6px; right: 6px; }}
 """
 
 _FONTS = (
@@ -65,8 +69,8 @@ _FONTS = (
 @contextmanager
 def frame(show_home_link: bool = True, show_calculator: bool = True):
     """Shared page chrome: header, main content column, and (optionally) a
-    sticky calculator on the right so the learner can check a number without
-    leaving the page."""
+    calculator on the right that only appears once a quiz scrolls into view,
+    so the learner can check a number without leaving the page."""
     from app.components.calculator import calculator  # lazy: avoids circular import
 
     ui.add_head_html(_FONTS)
@@ -77,13 +81,48 @@ def frame(show_home_link: bool = True, show_calculator: bool = True):
     ):
         ui.link("Finance Pathway", "/").classes("plain serif text-lg text-white")
         ui.space()
+        user = auth.current_user()
+        if user:
+            ui.label(user).classes("text-white text-sm mr-2")
+            ui.button(
+                icon="logout",
+                on_click=lambda: (auth.logout(), ui.navigate.to("/login")),
+            ).props("flat round dense color=white").tooltip("Log out").mark("logout-button")
         ui.label("Educational use only. Not financial advice.").classes(
             "text-xs text-white opacity-70"
         )
 
-    with ui.row().classes("w-full max-w-6xl mx-auto px-4 py-8 gap-8 items-start layout-row"):
+    with ui.row().classes(
+        "w-full max-w-6xl mx-auto px-4 py-8 gap-8 items-start justify-center layout-row"
+    ):
         with ui.column().classes("w-full max-w-3xl gap-6 min-w-0"):
             yield
         if show_calculator:
             with ui.column().classes("calc-sidebar gap-2"):
                 calculator()
+            # Reveal the calculator only while a quiz section is on screen.
+            ui.run_javascript(
+                """
+                (function() {
+                    const panel = document.querySelector('.calc-sidebar');
+                    if (!panel || panel.dataset.observed) return;
+                    panel.dataset.observed = '1';
+                    let closedManually = false;
+                    window.__closeCalcPanel = function() {
+                        panel.classList.remove('calc-visible');
+                        closedManually = true;
+                    };
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach((entry) => {
+                            if (entry.isIntersecting) {
+                                if (!closedManually) panel.classList.add('calc-visible');
+                            } else {
+                                panel.classList.remove('calc-visible');
+                                closedManually = false;
+                            }
+                        });
+                    }, { threshold: 0.15 });
+                    document.querySelectorAll('.quiz-anchor').forEach((el) => observer.observe(el));
+                })();
+                """
+            )
