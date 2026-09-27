@@ -2,8 +2,8 @@
 learner can check a number without leaving the page. Runs entirely on the
 server side (no eval, no JavaScript arithmetic) using a simple accumulator
 model, the same one a physical calculator uses. It is shown or hidden by
-the page frame based on scroll position; the close button here just lets
-the learner dismiss it early.
+the page frame based on scroll position, and can be dragged anywhere on
+screen by its title bar (see the drag script added in theme.py).
 """
 from nicegui import ui
 
@@ -36,13 +36,17 @@ def calculator() -> None:
     op_buttons: dict[str, ui.button] = {}
 
     with ui.column().classes("gap-2 w-full p-3").style(
-        f"background:#FFFFFF; border:1px solid {RULE}; border-radius:8px; position:relative;"
+        f"background:#FFFFFF; border:1px solid {RULE}; border-radius:8px;"
     ):
-        ui.button(icon="close", on_click=lambda: ui.run_javascript(
-            "window.__closeCalcPanel && window.__closeCalcPanel()"
-        )).props("flat round dense size=sm").classes("calc-close")
+        with ui.row().classes("w-full items-center justify-between calc-header").style(
+            "cursor:move; margin:-12px -12px 0 -12px; padding:8px 12px;"
+            f"background:{PAPER}; border-bottom:1px solid {RULE}; border-radius:8px 8px 0 0;"
+        ):
+            ui.label("Calculator").classes("text-sm").style(f"color:{MUTED}; user-select:none;")
+            ui.button(icon="close", on_click=lambda: ui.run_javascript(
+                "window.__closeCalcPanel && window.__closeCalcPanel()"
+            )).props("flat round dense size=sm")
 
-        ui.label("Calculator").classes("text-sm muted")
         display = ui.label("0").classes("w-full text-right").style(
             f"font-family:'IBM Plex Serif',Georgia,serif; font-size:1.4rem; color:{INK};"
             "padding:6px 4px; overflow-wrap:anywhere;"

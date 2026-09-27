@@ -240,6 +240,16 @@ def test_chatbot_fallback_answers_known_term():
     assert "compound" in answer.lower() or "interest" in answer.lower()
 
 
+def test_strip_markdown_removes_bold_and_bullets():
+    from app.services.chatbot import _strip_markdown
+    raw = "**NPV** is useful.\n- First point\n- Second point\n# A header\n*italic* text"
+    cleaned = _strip_markdown(raw)
+    assert "*" not in cleaned
+    assert "#" not in cleaned
+    assert "NPV" in cleaned
+    assert "First point" in cleaned
+
+
 def test_chatbot_fallback_unknown_term_points_to_examples():
     from app.services import chatbot
     answer = chatbot.ask("What is quantum computing?")
@@ -250,6 +260,7 @@ def test_company_lookup_known_company():
     from app.services import chatbot
     answer = chatbot.explain_company("Citigroup")
     assert "citi" in answer.lower()
+    assert "\n\n" in answer  # two paragraphs
 
 
 def test_company_lookup_unknown_company_lists_examples():
@@ -282,3 +293,15 @@ async def test_chat_widget_opens_and_answers(user: User):
     user.find(marker="chat-send-button").click()
     await user.should_see("What is compound interest?")
     await user.should_see("compound interest")
+
+
+async def test_chat_close_button_actually_closes(user: User):
+    await _login(user)
+    await user.open("/module/1")
+    bubble = user.find(marker="chat-bubble")
+    bubble.click()
+    await user.should_see("Ask about finance")
+    user.find(marker="chat-close-button").click()
+    # bubble should regain its visible (non-hidden) class once closed
+    bubble_el = next(iter(user.find(marker="chat-bubble").elements))
+    assert "chat-bubble-hidden" not in bubble_el._classes

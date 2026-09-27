@@ -30,7 +30,7 @@ def company_page() -> None:
 
         spinner = ui.spinner(size="md").classes("mt-4")
         spinner.visible = False
-        result = ui.column().classes("w-full gap-2 mt-2")
+        result = ui.column().classes("w-full gap-3 mt-2")
 
         def run_lookup() -> None:
             name = (name_input.value or "").strip()
@@ -45,7 +45,13 @@ def company_page() -> None:
                 spinner.visible = False
             with result:
                 ui.label(name).classes("text-2xl serif")
-                ui.markdown(answer)
+                # Render as plain paragraphs (not markdown) since the model
+                # is asked to avoid markdown syntax entirely; splitting on
+                # blank lines keeps the two-paragraph structure readable.
+                for paragraph in answer.split("\n\n"):
+                    paragraph = paragraph.strip()
+                    if paragraph:
+                        ui.label(paragraph).style("line-height:1.6;")
 
         lookup_btn.on_click(run_lookup)
         name_input.on("keydown.enter", run_lookup)

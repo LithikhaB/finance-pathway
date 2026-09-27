@@ -8,15 +8,22 @@ no external service configured, and gives a clear message when a topic or
 company isn't covered.
 """
 import os
+import re
 
 _MODEL = "openai/gpt-oss-20b"
+
+_NO_MARKDOWN_RULE = (
+    "Write in plain prose only: no markdown, no asterisks or underscores for "
+    "bold or italics, no bullet points, no headers, no numbered lists."
+)
 
 _CHAT_SYSTEM_PROMPT = (
     "You are a friendly finance tutor inside a personal-finance and fintech "
     "learning app called Finance Pathway. Answer in 3 to 5 plain-language "
     "sentences, and relate the answer back to fintech where it fits. You are "
     "not a licensed financial advisor, so add a brief reminder to that effect "
-    "only if the question asks for personal investment, tax, or legal advice."
+    "only if the question asks for personal investment, tax, or legal advice. "
+    f"{_NO_MARKDOWN_RULE}"
 )
 
 _CHAT_FAQ = {
@@ -33,6 +40,17 @@ _CHAT_FAQ = {
     "ltv": "LTV (customer lifetime value) estimates the total profit a customer generates over time. Compared against CAC, the cost to acquire them, it shows whether a business model works. See Module 10.",
     "cac": "CAC is the cost of acquiring one customer. A healthy business usually wants its LTV:CAC ratio above 3, and a payback period under about 12 months. See Module 10.",
 }
+
+
+def _strip_markdown(text: str) -> str:
+    """Defense in depth: remove common markdown artifacts even if the model
+    ignores the 'no markdown' instruction, since replies render as plain
+    text, not rendered markdown."""
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)  # **bold**
+    text = re.sub(r"(?<!\w)\*(.*?)\*(?!\w)", r"\1", text)  # *italic*
+    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)  # # headers
+    text = re.sub(r"^[\-\*\u2022]\s+", "", text, flags=re.MULTILINE)  # bullet points
+    return text.strip()
 
 
 def _fallback(question: str, faq: dict[str, str], topic_word: str) -> str:
@@ -79,28 +97,30 @@ def ask(question: str) -> str:
         return _fallback(question, _CHAT_FAQ, "term")
     if answer.startswith("(chatbot service unavailable"):
         return f"{answer}. Here's a quick answer instead:\n\n{_fallback(question, _CHAT_FAQ, 'term')}"
-    return answer
+    return _strip_markdown(answer)
 
 
 _COMPANY_SYSTEM_PROMPT = (
-    "You explain what a company does for a student studying fintech. In "
-    "under 150 words, cover: what the company does, its core revenue model, "
-    "and how it moves or manages money (payments, lending, deposits, or "
-    "similar). Be factual and neutral, and note if you are unsure of recent "
-    "details."
+    "You explain what a company does for a student studying fintech. Write "
+    "exactly two short paragraphs, separated by a blank line, nothing else. "
+    "Paragraph 1 (2 to 3 sentences): what the company does and its core "
+    "revenue model. Paragraph 2 (2 to 3 sentences): how it moves or manages "
+    "money (payments, lending, deposits, or similar). Be factual and "
+    "neutral, and note if you are unsure of recent details. "
+    f"{_NO_MARKDOWN_RULE}"
 )
 
 _COMPANY_FAQ = {
-    "citigroup": "Citigroup (Citi) is a global bank offering consumer banking, credit cards, and institutional services like corporate lending, trading, and treasury and cash management. It earns through net interest margin on loans and deposits, card interchange and fees, and fees for institutional services. As a systemically important bank, Citi moves money at huge scale across currencies and borders, and is closely supervised by regulators such as the US Federal Reserve and OCC.",
-    "citi": "Citigroup (Citi) is a global bank offering consumer banking, credit cards, and institutional services like corporate lending, trading, and treasury and cash management. It earns through net interest margin on loans and deposits, card interchange and fees, and fees for institutional services. As a systemically important bank, Citi moves money at huge scale across currencies and borders, and is closely supervised by regulators such as the US Federal Reserve and OCC.",
-    "jpmorgan chase": "JPMorgan Chase is one of the largest global banks, spanning consumer banking, credit cards, investment banking, and asset management. It earns through net interest margin, trading and advisory fees, and card fees. It moves enormous volumes of money daily, including clearing and settling payments for other banks and institutions worldwide.",
-    "paypal": "PayPal is a digital payments company that lets people and businesses send and receive money online. It earns mainly through transaction fees, a percentage of each payment processed, plus fees on services like currency conversion and instant transfers. PayPal holds customer balances and settles transactions between buyers, sellers, and banks, acting as a payment intermediary rather than a bank in most countries.",
-    "stripe": "Stripe is a payments infrastructure company that lets other businesses accept online payments. Its core revenue model is a take rate: a small percentage plus a fixed fee on every transaction it processes. Stripe handles the technical and compliance complexity of moving money between a customer's card or bank and a merchant's account, including fraud checks and settlement.",
-    "paytm": "Paytm is an Indian fintech offering a mobile wallet, UPI payments, and financial services like lending and insurance distribution. It earns through payment processing fees, commissions on financial products it distributes, and advertising on its app. It moves money by holding customer wallet balances and routing UPI transactions between banks in real time.",
-    "razorpay": "Razorpay is an Indian payments and banking infrastructure company that helps businesses accept and disburse payments. It earns a take rate on transactions processed, plus fees for additional services like payroll and lending. It sits between merchants and banks or card networks, handling authorization, routing, and settlement of funds.",
-    "square": "Square, part of Block, provides payment processing and point-of-sale hardware and software mainly for small businesses, alongside the Cash App consumer payments product. It earns a take rate on transactions and fees for services like instant deposits and loans, moving money between customers, merchants, and their banks.",
-    "block": "Block (formerly Square) provides payment processing and point-of-sale tools for small businesses, plus the consumer Cash App. It earns a take rate on transactions and fees for services like instant deposits, loans, and Bitcoin trading, moving money between customers, merchants, and their banks.",
-    "robinhood": "Robinhood is a US brokerage app offering commission-free stock, options, and crypto trading. It earns mainly through payment for order flow, interest on uninvested cash and margin lending, and subscription fees. It moves customer money into and out of markets, typically settling trades one business day after the trade (T+1).",
+    "citigroup": "Citigroup (Citi) is a global bank offering consumer banking, credit cards, and institutional services like corporate lending, trading, and treasury and cash management. It earns through net interest margin on loans and deposits, card interchange and fees, and fees for institutional services.\n\nAs a systemically important bank, Citi moves money at huge scale across currencies and borders, and is closely supervised by regulators such as the US Federal Reserve and OCC.",
+    "citi": "Citigroup (Citi) is a global bank offering consumer banking, credit cards, and institutional services like corporate lending, trading, and treasury and cash management. It earns through net interest margin on loans and deposits, card interchange and fees, and fees for institutional services.\n\nAs a systemically important bank, Citi moves money at huge scale across currencies and borders, and is closely supervised by regulators such as the US Federal Reserve and OCC.",
+    "jpmorgan chase": "JPMorgan Chase is one of the largest global banks, spanning consumer banking, credit cards, investment banking, and asset management. It earns through net interest margin, trading and advisory fees, and card fees.\n\nIt moves enormous volumes of money daily, including clearing and settling payments for other banks and institutions worldwide.",
+    "paypal": "PayPal is a digital payments company that lets people and businesses send and receive money online. It earns mainly through transaction fees, a percentage of each payment processed, plus fees on services like currency conversion and instant transfers.\n\nPayPal holds customer balances and settles transactions between buyers, sellers, and banks, acting as a payment intermediary rather than a bank in most countries.",
+    "stripe": "Stripe is a payments infrastructure company that lets other businesses accept online payments. Its core revenue model is a take rate: a small percentage plus a fixed fee on every transaction it processes.\n\nStripe handles the technical and compliance complexity of moving money between a customer's card or bank and a merchant's account, including fraud checks and settlement.",
+    "paytm": "Paytm is an Indian fintech offering a mobile wallet, UPI payments, and financial services like lending and insurance distribution. It earns through payment processing fees, commissions on financial products it distributes, and advertising on its app.\n\nIt moves money by holding customer wallet balances and routing UPI transactions between banks in real time.",
+    "razorpay": "Razorpay is an Indian payments and banking infrastructure company that helps businesses accept and disburse payments. It earns a take rate on transactions processed, plus fees for additional services like payroll and lending.\n\nIt sits between merchants and banks or card networks, handling authorization, routing, and settlement of funds.",
+    "square": "Square, part of Block, provides payment processing and point-of-sale hardware and software mainly for small businesses, alongside the Cash App consumer payments product. It earns a take rate on transactions and fees for services like instant deposits and loans.\n\nIt moves money between customers, merchants, and their banks, including short-term financing for merchants.",
+    "block": "Block (formerly Square) provides payment processing and point-of-sale tools for small businesses, plus the consumer Cash App. It earns a take rate on transactions and fees for services like instant deposits, loans, and Bitcoin trading.\n\nIt moves money between customers, merchants, and their banks as part of everyday payment processing.",
+    "robinhood": "Robinhood is a US brokerage app offering commission-free stock, options, and crypto trading. It earns mainly through payment for order flow, interest on uninvested cash and margin lending, and subscription fees.\n\nIt moves customer money into and out of markets, typically settling trades one business day after the trade (T+1).",
 }
 
 
@@ -111,7 +131,7 @@ def explain_company(name: str) -> str:
         return "Enter a company name to look up."
     answer = _call_groq(_COMPANY_SYSTEM_PROMPT, f"Explain the company: {name}")
     if answer is not None and not answer.startswith("(chatbot service unavailable"):
-        return answer
+        return _strip_markdown(answer)
     if key in _COMPANY_FAQ:
         return _COMPANY_FAQ[key]
     examples = ", ".join(sorted({n.title() for n in _COMPANY_FAQ}))

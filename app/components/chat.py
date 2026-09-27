@@ -1,43 +1,33 @@
 """A small floating chat widget. Unlike the calculator (which only appears
 during a quiz), this is available on every page: click the bubble in the
 bottom-right corner to open a chat panel, ask a finance question, and get
-an answer from `app.services.chatbot`.
+an answer from `app.services.chatbot`. Drag the "Ask about finance" title
+bar to move the panel anywhere on screen (see the drag script in theme.py).
 """
 from nicegui import ui
 
 from app.services import chatbot
 from app.theme import INK, MUTED, PAPER, RULE, TEAL
 
-_BUBBLE_STYLE = (
-    "position:fixed; bottom:24px; right:24px; z-index:1000; "
-    f"background:{TEAL}; color:#FFFFFF; border-radius:50%; width:56px; height:56px; "
-    "box-shadow:0 4px 14px rgba(0,0,0,0.25);"
-)
-# Fixed total height (not flex-based) so every section inside gets real,
-# predictable space instead of collapsing to zero.
-_PANEL_HIDDEN = (
-    "position:fixed; bottom:92px; right:24px; z-index:1000; width:320px; max-width:calc(100vw - 32px); "
-    "height:420px; "
-    f"background:#FFFFFF; border:1px solid {RULE}; border-radius:10px; "
-    "box-shadow:0 8px 30px rgba(0,0,0,0.18); display:none; flex-direction:column; overflow:hidden;"
-)
-_PANEL_VISIBLE = _PANEL_HIDDEN.replace("display:none", "display:flex")
-
 
 def chat_widget() -> None:
-    panel = ui.column().classes("chat-panel gap-0").style(_PANEL_HIDDEN)
+    panel = ui.column().classes("chat-panel gap-0")
     with panel:
-        with ui.row().classes("w-full items-center justify-between px-3 py-2").style(
+        with ui.row().classes("w-full items-center justify-between px-3 py-2 chat-header").style(
             f"background:{INK}; flex-shrink:0;"
         ):
-            ui.label("Ask about finance").classes("text-white text-sm font-medium")
-            close_btn = ui.button(icon="close").props("flat round dense size=sm color=white")
+            ui.label("Ask about finance").classes("text-white text-sm font-medium").style(
+                "user-select:none;"
+            )
+            close_btn = ui.button(icon="close").props("flat round dense size=sm color=white").mark(
+                "chat-close-button"
+            )
 
-        # Fixed pixel height + overflow-y auto, deliberately not a flex-sized
-        # ui.scroll_area, which collapses to 0 height without an explicit
-        # pixel height on every ancestor.
+        # Flexes to fill whatever space is left after the header and input
+        # row take theirs, so the input row (and send button) is never
+        # pushed out of view by a growing message list or a tall textarea.
         messages = ui.column().classes("w-full gap-2 p-3").style(
-            "height:288px; overflow-y:auto; flex-shrink:0;"
+            "flex:1; min-height:0; overflow-y:auto;"
         )
         with messages:
             ui.label(
@@ -53,7 +43,7 @@ def chat_widget() -> None:
             ).mark("chat-question-input")
             send_btn = ui.button(icon="send").props("flat round dense").mark("chat-send-button")
 
-    bubble = ui.button(icon="chat").style(_BUBBLE_STYLE).mark("chat-bubble")
+    bubble = ui.button(icon="chat").classes("chat-bubble").mark("chat-bubble")
 
     def add_message(role: str, text: str) -> None:
         with messages:
@@ -66,17 +56,17 @@ def chat_widget() -> None:
                     "max-width:85%; white-space:pre-wrap;"
                 )
         ui.run_javascript(
-            "setTimeout(() => { const els = document.querySelectorAll('.chat-panel > div'); "
-            "if (els[1]) els[1].scrollTop = els[1].scrollHeight; }, 50);"
+            "setTimeout(() => { const m = document.querySelector('.chat-panel > div:nth-child(2)'); "
+            "if (m) m.scrollTop = m.scrollHeight; }, 50);"
         )
 
     def open_panel() -> None:
-        panel.style(replace=_PANEL_VISIBLE)
-        bubble.style(replace=_BUBBLE_STYLE + " display:none;")
+        panel.classes(add="chat-open")
+        bubble.classes(add="chat-bubble-hidden")
 
     def close_panel() -> None:
-        panel.style(replace=_PANEL_HIDDEN)
-        bubble.style(replace=_BUBBLE_STYLE)
+        panel.classes(remove="chat-open")
+        bubble.classes(remove="chat-bubble-hidden")
 
     def send() -> None:
         text = (question.value or "").strip()

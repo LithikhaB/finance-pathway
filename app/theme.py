@@ -56,7 +56,23 @@ a.plain:hover {{ text-decoration: underline; }}
     .layout-row {{ flex-wrap: wrap; }}
     .calc-sidebar {{ position: static; width: 100%; max-width: 320px; }}
 }}
-.calc-close {{ position: absolute; top: 6px; right: 6px; }}
+/* Chat bubble and panel: fixed in the corner by default, but both this and
+   the calculator can be dragged by their header once the drag script (added
+   in frame()) attaches to them. */
+.chat-bubble {{
+    position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+    background: {TEAL}; color: #FFFFFF; border-radius: 50%; width: 56px; height: 56px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}}
+.chat-bubble.chat-bubble-hidden {{ display: none; }}
+.chat-panel {{
+    position: fixed; bottom: 92px; right: 24px; z-index: 1000; width: 320px;
+    max-width: calc(100vw - 32px); height: 420px; background: #FFFFFF;
+    border: 1px solid {RULE}; border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.18); display: none; overflow: hidden;
+}}
+.chat-panel.chat-open {{ display: flex; flex-direction: column; }}
+.calc-header, .chat-header {{ cursor: move; touch-action: none; }}
 """
 
 _FONTS = (
@@ -129,3 +145,50 @@ def frame(show_home_link: bool = True, show_calculator: bool = True, show_chat: 
             )
         if show_chat:
             chat_widget()
+        # Let the calculator and chat panel be dragged by their header, so they
+        # can be moved apart if they'd otherwise overlap.
+        ui.run_javascript(
+            """
+            (function() {
+                function enableDrag(panelSelector, handleSelector) {
+                    const panel = document.querySelector(panelSelector);
+                    if (!panel || panel.dataset.draggable) return;
+                    const handle = panel.querySelector(handleSelector);
+                    if (!handle) return;
+                    panel.dataset.draggable = '1';
+                    let dragging = false, offsetX = 0, offsetY = 0;
+                    handle.addEventListener('pointerdown', (e) => {
+                        if (e.target.closest('button, .q-btn')) return;
+                        dragging = true;
+                        const rect = panel.getBoundingClientRect();
+                        offsetX = e.clientX - rect.left;
+                        offsetY = e.clientY - rect.top;
+                        panel.style.position = 'fixed';
+                        panel.style.left = rect.left + 'px';
+                        panel.style.top = rect.top + 'px';
+                        panel.style.right = 'auto';
+                        panel.style.bottom = 'auto';
+                        handle.setPointerCapture(e.pointerId);
+                        e.preventDefault();
+                    });
+                    handle.addEventListener('pointermove', (e) => {
+                        if (!dragging) return;
+                        let x = e.clientX - offsetX;
+                        let y = e.clientY - offsetY;
+                        x = Math.max(0, Math.min(window.innerWidth - 60, x));
+                        y = Math.max(0, Math.min(window.innerHeight - 40, y));
+                        panel.style.left = x + 'px';
+                        panel.style.top = y + 'px';
+                    });
+                    const stop = (e) => {
+                        dragging = false;
+                        try { handle.releasePointerCapture(e.pointerId); } catch (err) {}
+                    };
+                    handle.addEventListener('pointerup', stop);
+                    handle.addEventListener('pointercancel', stop);
+                }
+                enableDrag('.calc-sidebar', '.calc-header');
+                enableDrag('.chat-panel', '.chat-header');
+            })();
+            """
+        )
